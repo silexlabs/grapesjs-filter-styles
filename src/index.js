@@ -12,9 +12,8 @@ export default (editor, opts = {}) => {
     const container = document.createElement('div')
     container.innerHTML = `
       <style>
-        #${id}-btn {
+        #${id}-btn, #${id}-modified-btn {
           position: absolute;
-          right: 0;
           border: none;
           padding: 5px;
           margin: 5px;
@@ -31,12 +30,34 @@ export default (editor, opts = {}) => {
           cursor: pointer;
           opacity: .75;
         }
+        #${id}-btn{ 
+          right: 0; 
+        }
+        #${id}-modified-btn { 
+          right: 30px; 
+          opacity: .25;
+        }
+        #${id}-modified-btn i {
+          font-size: 10px;
+          display: block;
+        }
+        #${id}-modified-btn.active {
+          color: var(--gjs-main-color);
+          background-color: var(--gjs-tertiary-color);
+          border-color: var(--gjs-tertiary-color);
+          box-shadow: 0 0 5px var(--gjs-main-dark-color);
+          opacity: 1;
+        }
         .empty #${id}-btn {
           cursor: initial;
           opacity: .25;
         }
       </style>
 
+      <button 
+        id="${id}-modified-btn" 
+        title="Show modified only"
+        ><i class="fa-solid fa-filter"></i></button>
       <button
         id="${id}-btn"
         class="gjs-field gjs-sm-properties gjs-two-color"
@@ -53,6 +74,11 @@ export default (editor, opts = {}) => {
     const button = wrapper.querySelector(`#${id}-btn`)
     button.onclick = () => {
       input.value = ''
+      refresh(editor, input, wrapper)
+    }
+    const modBtn = wrapper.querySelector(`#${id}-modified-btn`);
+    modBtn.onclick = () => {
+      modBtn.classList.toggle('active');
       refresh(editor, input, wrapper)
     }
     editor.on('component:selected component:styleUpdate style:target', () => {
@@ -174,7 +200,7 @@ function getSearchableItems(editor) {
         ${property.get('options')?.map(option => option.id).join(', ') ?? ''}
         ${subprop?.get('name') ?? ''}
         ${subprop?.get('options')?.map(option => option.id).join(', ') ?? ''}
-      `,
+        `.replace(/\s+/g, ' ').trim(),
       sector,
       property,
     }))
@@ -188,29 +214,31 @@ function getSearchableItems(editor) {
  * @param wrapper The wrapper element.
  */
 function refresh(editor, input, wrapper) {
-  if (input.value) {
-    // Display
-    wrapper.classList.remove('empty')
+  const modBtn = wrapper.querySelector(`[id$="-modified-btn"]`);
+  const showOnlyModified = modBtn && modBtn.classList.contains('active');
 
-    // Get searchable items
-    const properties = getSearchableItems(editor)
-      // Keep only the matching items
-      .filter(item => item.searchable.toLowerCase().includes(input.value.toLowerCase()))
+  if (input.value || showOnlyModified) {
+    wrapper.classList.remove('empty');
 
-    // Close and hide all sectors and properties
-    getSectors(editor)
-      .forEach(sector => {
-        showSector(sector, false)
-        sector.getProperties()
-          .forEach(property => showProperty(property, false))
-      })
-    // Show the one we are searching for
+    const properties = getSearchableItems(editor).filter(item => {
+      const matchesSearch = item.searchable.toLowerCase().includes(input.value.toLowerCase());
+      const isModified = item.property.hasValue({ noParent: true });
+      //  text search AND modification status
+      return showOnlyModified ? (matchesSearch && isModified) : matchesSearch;
+    });
+    // Reset visibility
+    getSectors(editor).forEach(sector => {
+      showSector(sector, false);
+      sector.getProperties().forEach(property => showProperty(property, false));
+    });
+    // Show filtered results
     properties.forEach(item => {
-      showSector(item.sector, true)
-      showProperty(item.property, true)
-    })
+      showSector(item.sector, true);
+      showProperty(item.property, true);
+    });
+
   } else {
-    wrapper.classList.add('empty')
-    resetAll(editor)
+    wrapper.classList.add('empty');
+    resetAll(editor);
   }
 }
