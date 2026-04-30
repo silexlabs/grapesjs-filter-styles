@@ -15,7 +15,7 @@ export default (editor, opts = {}) => {
         #${id}-btn, #${id}-modified-btn {
           position: absolute;
           border: none;
-          padding: 5px;
+          padding: 0;
           margin: 5px;
           line-height: 1;
           border-radius: 50%;
@@ -37,9 +37,11 @@ export default (editor, opts = {}) => {
           right: 30px; 
           opacity: .25;
         }
-        #${id}-modified-btn i {
-          font-size: 10px;
+        #${id}-btn svg, #${id}-modified-btn svg {
+          width: 16px; 
+          height: 16px;
           display: block;
+          pointer-events: none;
         }
         #${id}-modified-btn.active {
           color: var(--gjs-main-color);
@@ -57,11 +59,19 @@ export default (editor, opts = {}) => {
       <button 
         id="${id}-modified-btn" 
         title="Show modified only"
-        ><i class="fa-solid fa-filter"></i></button>
+        >
+        <svg fill="#000000" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M19 6h-14c-1.1 0-1.4.6-.6 1.4l4.2 4.2c.8.8 1.4 2.3 1.4 3.4v5l4-2v-3.5c0-.8.6-2.1 1.4-2.9l4.2-4.2c.8-.8.5-1.4-.6-1.4z"/>
+        </svg>
+        </button>
       <button
         id="${id}-btn"
         class="gjs-field gjs-sm-properties gjs-two-color"
-        >X</button>
+        >
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none">
+          <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 12 7 7m5 5 5 5m-5-5 5-5m-5 5-5 5"/>
+        </svg>
+        </button>
       <input id="${id}" type="text" class="gjs-field gjs-sm-properties gjs-two-color" placeholder="${options.placeholder}" />
     `
     const tags = editor.getContainer().querySelector(`.${prefix}clm-tags`)
@@ -69,21 +79,26 @@ export default (editor, opts = {}) => {
     const appendTo = typeof options.appendTo === 'string' ? document.querySelector(options.appendTo) : options.appendTo
     const wrapper = appendBefore ? appendBefore.parentElement : appendTo ?? tags.parentElement.parentElement
     wrapper.insertBefore(container, appendBefore ?? tags.parentElement.parentElement.lastElementChild)
+    
     const input = wrapper.querySelector(`#${id}`)
-    input.onkeyup = () => refresh(editor, input, wrapper)
     const button = wrapper.querySelector(`#${id}-btn`)
+    const modBtn = wrapper.querySelector(`#${id}-modified-btn`)
+
+    input.onkeyup = () => refresh(editor, input, wrapper, modBtn)
+    
     button.onclick = () => {
       input.value = ''
-      refresh(editor, input, wrapper)
+      refresh(editor, input, wrapper, modBtn)
     }
-    const modBtn = wrapper.querySelector(`#${id}-modified-btn`);
+    
     modBtn.onclick = () => {
-      modBtn.classList.toggle('active');
-      refresh(editor, input, wrapper)
+      modBtn.classList.toggle('active')
+      refresh(editor, input, wrapper, modBtn)
     }
+    
     editor.on('component:selected component:styleUpdate style:target', () => {
       resetAll(editor)
-      setTimeout(() => refresh(editor, input, wrapper))
+      setTimeout(() => refresh(editor, input, wrapper, modBtn))
     })
   })
 }
@@ -213,32 +228,31 @@ function getSearchableItems(editor) {
  * @param input The text input.
  * @param wrapper The wrapper element.
  */
-function refresh(editor, input, wrapper) {
-  const modBtn = wrapper.querySelector(`[id$="-modified-btn"]`);
-  const showOnlyModified = modBtn && modBtn.classList.contains('active');
+function refresh(editor, input, wrapper, modBtn) {
+  const showOnlyModified = modBtn && modBtn.classList.contains('active')
 
   if (input.value || showOnlyModified) {
-    wrapper.classList.remove('empty');
+    wrapper.classList.remove('empty')
 
     const properties = getSearchableItems(editor).filter(item => {
-      const matchesSearch = item.searchable.toLowerCase().includes(input.value.toLowerCase());
-      const isModified = item.property.hasValue({ noParent: true });
+      const matchesSearch = item.searchable.toLowerCase().includes(input.value.trim().toLowerCase())
+      const isModified = item.property.hasValue({ noParent: true })
       //  text search AND modification status
-      return showOnlyModified ? (matchesSearch && isModified) : matchesSearch;
-    });
+      return showOnlyModified ? (matchesSearch && isModified) : matchesSearch
+    })
     // Reset visibility
     getSectors(editor).forEach(sector => {
-      showSector(sector, false);
-      sector.getProperties().forEach(property => showProperty(property, false));
-    });
+      showSector(sector, false)
+      sector.getProperties().forEach(property => showProperty(property, false))
+    })
     // Show filtered results
     properties.forEach(item => {
-      showSector(item.sector, true);
-      showProperty(item.property, true);
-    });
+      showSector(item.sector, true)
+      showProperty(item.property, true)
+    })
 
   } else {
-    wrapper.classList.add('empty');
-    resetAll(editor);
+    wrapper.classList.add('empty')
+    resetAll(editor)
   }
 }
